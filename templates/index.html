@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sistem Pendaftaran Kehadiran</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/themes/base/jquery-ui.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+  <style>
+    body {
+      background-color: #f8f9fa;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .form-container {
+      max-width: 900px;
+      margin: 40px auto;
+    }
+    
+    .card {
+      border: none;
+      border-radius: 15px;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+    
+    .card-header {
+      background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+      padding: 20px 30px;
+      border-bottom: none;
+    }
+    
+    .card-body {
+      padding: 40px 30px;
+    }
+    
+    .form-label {
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #495057;
+    }
+    
+    .form-control {
+      border-radius: 8px;
+      padding: 12px 15px;
+      border: 1px solid #ced4da;
+      transition: all 0.3s ease;
+    }
+    
+    .form-control:focus {
+      box-shadow: 0 0 0 0.25rem rgba(78, 115, 223, 0.25);
+      border-color: #4e73df;
+    }
+    
+    .input-group-text {
+      background-color: #4e73df;
+      color: white;
+      border: none;
+      border-radius: 8px 0 0 8px;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+      border: none;
+      border-radius: 8px;
+      padding: 12px 15px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(78, 115, 223, 0.4);
+    }
+    
+    .modal-content {
+      border-radius: 15px;
+      border: none;
+    }
+    
+    .modal-header.bg-success {
+      background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%) !important;
+    }
+    
+    .modal-header.bg-danger {
+      background: linear-gradient(135deg, #dc3545 0%, #bd2130 100%) !important;
+    }
+    
+    .form-floating label {
+      padding-left: 15px;
+    }
+    
+    .form-floating .form-control {
+      height: 58px;
+    }
+    
+    .form-section {
+      background-color: #fff;
+      border-radius: 12px;
+      padding: 25px;
+      margin-bottom: 25px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+    }
+    
+    .section-title {
+      font-size: 1.2rem;
+      color: #4e73df;
+      margin-bottom: 20px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+    }
+    
+    .section-title i {
+      margin-right: 10px;
+    }
+    
+    .input-feedback {
+      font-size: 0.85rem;
+      margin-top: 5px;
+      color: #6c757d;
+    }
+    
+    /* Custom date picker styles */
+    .ui-datepicker {
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      padding: 15px;
+    }
+    
+    .ui-datepicker-header {
+      background: #4e73df;
+      border: none;
+      border-radius: 8px;
+      color: white;
+    }
+    
+    .ui-datepicker-calendar .ui-state-default {
+      border-radius: 5px;
+    }
+    
+    .ui-datepicker-calendar .ui-state-active {
+      background: #4e73df;
+      color: white;
+    }
+    
+    /* Autocomplete styling */
+    .ui-autocomplete {
+      border-radius: 8px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      padding: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    
+    .ui-menu-item {
+      padding: 8px 12px;
+      border-radius: 5px;
+    }
+    
+    .ui-menu-item:hover {
+      background: #f0f4ff;
+    }
+    
+    /* Progress bar */
+    .progress {
+      height: 8px;
+      margin-bottom: 20px;
+      border-radius: 4px;
+    }
+    
+    /* Custom toggle switch */
+    .form-switch .form-check-input {
+      width: 3em;
+      height: 1.5em;
+    }
+    
+    .form-switch .form-check-input:checked {
+      background-color: #4e73df;
+      border-color: #4e73df;
+    }
+    
+    /* Animation */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .fade-in {
+      animation: fadeIn 0.5s ease forwards;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .card-body {
+        padding: 25px 15px;
+      }
+      
+      .form-section {
+        padding: 15px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container form-container">
+    <div class="progress fade-in">
+      <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%" id="formProgress"></div>
+    </div>
+    
+    <div class="card shadow fade-in">
+      <div class="card-header">
+        <h3 class="mb-0 text-white d-flex align-items-center">
+          <i class="fas fa-clipboard-check me-2"></i> Form Kehadiran
+        </h3>
+        <p class="text-white-50 mb-0 mt-2">Silakan isi form di bawah ini untuk mendaftarkan kehadiran</p>
+      </div>
+      
+      <div class="card-body">
+        <form id="presenceForm">
+          <!-- Couple Information Section -->
+          <div class="form-section">
+            <h4 class="section-title"><i class="fas fa-user-friends"></i> Informasi Pasangan</h4>
+            
+            <div class="row g-4">
+              <div class="col-md-6">
+                <div class="form-floating mb-1">
+                  <input 
+                    type="text" 
+                    class="form-control autocomplete" 
+                    id="namaSuami" 
+                    name="nama_suami" 
+                    required 
+                    data-field="Nama Lengkap Peserta (Suami)" 
+                    placeholder="Nama Lengkap (Suami)">
+                  <label for="namaSuami">Nama Lengkap (Suami)</label>
+                </div>
+                <div class="input-feedback">Masukkan nama suami sesuai pendaftaran</div>
+              </div>
+              
+              <div class="col-md-6">
+                <div class="form-floating mb-1">
+                  <input 
+                    type="text" 
+                    class="form-control autocomplete" 
+                    id="namaIstri" 
+                    name="nama_istri" 
+                    required 
+                    data-field="Nama Lengkap Peserta (Istri)" 
+                    placeholder="Nama Lengkap (Istri)">
+                  <label for="namaIstri">Nama Lengkap (Istri)</label>
+                </div>
+                <div class="input-feedback">Masukkan nama istri sesuai pendaftaran</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Contact Information Section -->
+          <div class="form-section">
+            <h4 class="section-title"><i class="fas fa-address-card"></i> Informasi Kontak & Tanggal</h4>
+            
+            <div class="row g-4">
+              <div class="col-md-6">
+                <div class="input-group mb-1">
+                  <span class="input-group-text">
+                    <i class="fas fa-phone"></i>
+                  </span>
+                  <div class="form-floating flex-grow-1">
+                    <input 
+                      type="tel" 
+                      class="form-control" 
+                      id="phoneNumber" 
+                      name="phone_number" 
+                      required 
+                      placeholder="Nomor Handphone/WA">
+                    <label for="phoneNumber">Nomor Handphone/WA</label>
+                  </div>
+                </div>
+                <div class="input-feedback">Masukkan nomor handphone untuk keperluan komunikasi</div>
+              </div>
+              
+              <div class="col-md-6">
+                <div class="input-group mb-1">
+                  <span class="input-group-text">
+                    <i class="fas fa-calendar-alt"></i>
+                  </span>
+                  <div class="form-floating flex-grow-1">
+                    <input 
+                      type="date" 
+                      class="form-control" 
+                      id="tanggalPernikahan" 
+                      name="tanggal_pernikahan" 
+                      required 
+                      placeholder="Tanggal Pernikahan">
+                    <label for="tanggalPernikahan">Tanggal Pernikahan</label>
+                  </div>
+                </div>
+                <div class="input-feedback">Pilih tanggal pernikahan</div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Additional Information Section -->
+          <div class="form-section">
+            <h4 class="section-title"><i class="fas fa-comment-alt"></i> Informasi Tambahan</h4>
+            
+            <div class="form-floating mb-3">
+              <textarea 
+                class="form-control" 
+                id="remarks" 
+                name="remarks" 
+                rows="3" 
+                style="height: 100px" 
+                placeholder="Catatan tambahan"></textarea>
+              <label for="remarks">Catatan (Opsional)</label>
+            </div>
+            <div class="input-feedback">Kebutuhan khusus atau informasi tambahan</div>
+          </div>
+          
+          <!-- Submit Button -->
+          <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary btn-lg">
+              <i class="fas fa-paper-plane me-2"></i> Kirim
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-success text-white">
+            <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i> Berhasil</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body text-center py-4">
+            <div class="mb-4">
+              <i class="fas fa-check-circle fa-5x text-success"></i>
+            </div>
+            <h4>Terima Kasih!</h4>
+            <p class="mb-0">Kehadiran Anda berhasil dicatat!</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error Modal -->
+    <div class="modal fade" id="errorModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header bg-danger text-white">
+            <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i> Terjadi Kesalahan</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body text-center py-4">
+            <div class="mb-4">
+              <i class="fas fa-exclamation-circle fa-5x text-danger"></i>
+            </div>
+            <h4>Oops!</h4>
+            <p id="errorMessage" class="mb-0">Terjadi kesalahan saat memproses permintaan.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui/1.13.2/jquery-ui.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    $(document).ready(function() {
+      // ----------------------------------------------------------
+      // 1) Autocomplete Setup for "Nama Suami" and "Nama Istri"
+      // ----------------------------------------------------------
+      $(".autocomplete").each(function() {
+        const field = $(this).data("field"); 
+        // e.g. "Nama Lengkap Peserta (Suami)" or "Nama Lengkap Peserta (Istri)"
+
+        $(this).autocomplete({
+          source: function(request, response) {
+            $.ajax({
+              url: "/api/autocomplete",
+              dataType: "json",
+              data: {
+                term: request.term,
+                field: field
+              },
+              success: function(data) {
+                response(data.suggestions);
+              },
+              error: function() {
+                response([]);
+              }
+            });
+          },
+          minLength: 1,
+          select: function(event, ui) {
+            $(this).val(ui.item.value);
+            fetchPersonDetails(); 
+            return false;
+          }
+        });
+      });
+
+      // Also fetch details on blur, in case user typed by hand
+      $("#namaSuami, #namaIstri").on("blur", function() {
+        fetchPersonDetails();
+      });
+
+      // ----------------------------------------------------------
+      // 2) Fetch Person Details (auto-fill nama istri, phone, date)
+      // ----------------------------------------------------------
+      function fetchPersonDetails() {
+        const suami = $("#namaSuami").val().trim();
+        const istri = $("#namaIstri").val().trim();
+        if (!suami && !istri) return;
+
+        $.ajax({
+          url: "/api/get_person_details",
+          dataType: "json",
+          data: {
+            nama_suami: suami,
+            nama_istri: istri
+          },
+          success: function(res) {
+            if (res.success) {
+              const person = res.person;
+              // Fill the form fields
+              $("#namaSuami").val(person["Nama Lengkap Peserta (Suami)"] || "");
+              $("#namaIstri").val(person["Nama Lengkap Peserta (Istri)"] || "");
+              $("#phoneNumber").val(person["Nomor Handphone/ WA"] || "");
+              
+              if (person["Tanggal Pernikahan"]) {
+                $("#tanggalPernikahan").val(formatDateForInput(person["Tanggal Pernikahan"]));
+              }
+            }
+          },
+          error: function() {
+            // Silently ignore
+          }
+        });
+      }
+
+      // Helper to convert date to "YYYY-MM-DD"
+      function formatDateForInput(dateStr) {
+        const d = new Date(dateStr);
+        if (!isNaN(d)) {
+          return d.toISOString().split("T")[0];
+        }
+        return dateStr; // fallback
+      }
+
+      // ----------------------------------------------------------
+      // 3) Optional jQuery UI DatePicker 
+      //    (If you prefer <input type="date" only, you can remove this.)
+      // ----------------------------------------------------------
+      $("#tanggalPernikahan").datepicker({
+        dateFormat: 'yy-mm-dd',
+        changeMonth: true,
+        changeYear: true,
+        yearRange: '1950:2050',
+        showButtonPanel: true,
+        beforeShow: function(input) {
+          setTimeout(function() {
+            var buttonPane = $(input).datepicker("widget").find(".ui-datepicker-buttonpane");
+            $("<button>", {
+              text: "Hari Ini",
+              click: function() {
+                $.datepicker._gotoToday(input);
+                $(input).datepicker("hide");
+              }
+            })
+            .appendTo(buttonPane)
+            .addClass("ui-datepicker-current ui-state-default ui-priority-secondary ui-corner-all");
+          }, 1);
+        }
+      });
+
+      // ----------------------------------------------------------
+      // 4) Progress Bar for Required Fields
+      // ----------------------------------------------------------
+      function updateProgress() {
+        const requiredFields = $("#presenceForm :input[required]");
+        const filledFields = requiredFields.filter(function() {
+          return $(this).val().trim() !== "";
+        }).length;
+        const percentage = Math.round((filledFields / requiredFields.length) * 100);
+        $("#formProgress").css("width", percentage + "%").attr("aria-valuenow", percentage);
+        
+        if (percentage === 100) {
+          $("#formProgress").removeClass("progress-bar-striped progress-bar-animated");
+        } else {
+          $("#formProgress").addClass("progress-bar-striped progress-bar-animated");
+        }
+      }
+      $("#presenceForm :input").on("change keyup", updateProgress);
+      updateProgress();
+
+      // ----------------------------------------------------------
+      // 5) Optional Phone Number Formatting (Indonesian style)
+      // ----------------------------------------------------------
+      $("#phoneNumber").on("input", function() {
+        const input = $(this).val().replace(/\D/g, '');
+        if (input.length > 0) {
+          if (input.startsWith('0')) {
+            if (input.length <= 4) {
+              $(this).val(input);
+            } else if (input.length <= 8) {
+              $(this).val(input.substring(0, 4) + '-' + input.substring(4));
+            } else {
+              $(this).val(input.substring(0, 4) + '-' + input.substring(4, 8) + '-' + input.substring(8, 12));
+            }
+          } else if (input.startsWith('62')) {
+            if (input.length <= 5) {
+              $(this).val(input);
+            } else if (input.length <= 9) {
+              $(this).val(input.substring(0, 5) + '-' + input.substring(5));
+            } else {
+              $(this).val(input.substring(0, 5) + '-' + input.substring(5, 9) + '-' + input.substring(9, 13));
+            }
+          } else {
+            if (input.length <= 3) {
+              $(this).val(input);
+            } else if (input.length <= 7) {
+              $(this).val(input.substring(0, 3) + '-' + input.substring(3));
+            } else {
+              $(this).val(input.substring(0, 3) + '-' + input.substring(3, 7) + '-' + input.substring(7, 11));
+            }
+          }
+        }
+      });
+
+      // ----------------------------------------------------------
+      // 6) Form Submission -> POST /api/submit
+      // ----------------------------------------------------------
+      $("#presenceForm").on("submit", function(e) {
+        e.preventDefault();
+
+        // Simple front-end validation (required fields)
+        const requiredFields = $(this).find("[required]");
+        let isValid = true;
+        requiredFields.each(function() {
+          if (!$(this).val().trim()) {
+            $(this).addClass("is-invalid");
+            isValid = false;
+          } else {
+            $(this).removeClass("is-invalid");
+          }
+        });
+        if (!isValid) {
+          $("#errorMessage").text("Silakan lengkapi semua isian yang wajib.");
+          $("#errorModal").modal("show");
+          return;
+        }
+
+        // Actually send data to the backend
+        const formData = new FormData(this);
+        $.ajax({
+          url: "/api/submit",
+          type: "POST",
+          data: formData,
+          processData: false,
+          contentType: false,
+          success: function(response) {
+            if (response.success) {
+              $("#successModal").modal("show");
+              $("#presenceForm")[0].reset();
+              updateProgress();
+            } else {
+              $("#errorMessage").text(response.message || "Terjadi kesalahan.");
+              $("#errorModal").modal("show");
+            }
+          },
+          error: function(xhr) {
+            let errorMsg = "Terjadi kesalahan saat memproses permintaan.";
+            try {
+              errorMsg = JSON.parse(xhr.responseText).detail;
+            } catch (e) {}
+            $("#errorMessage").text(errorMsg);
+            $("#errorModal").modal("show");
+          }
+        });
+      });
+
+      // ----------------------------------------------------------
+      // 7) Fade-in Animation
+      // ----------------------------------------------------------
+      $(".fade-in").css("opacity", "1");
+    });
+  </script>
+</body>
+</html>

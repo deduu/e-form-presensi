@@ -1,0 +1,5 @@
+venv
+credentials.json
+presence_data.xlsx
+service_account.json
+__pycache__
