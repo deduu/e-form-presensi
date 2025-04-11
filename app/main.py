@@ -1,9 +1,9 @@
-from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi import FastAPI, Request, Form, HTTPException, BackgroundTasks
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 from typing import Optional
 import uvicorn
@@ -14,6 +14,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
 app = FastAPI(title="Presence Management System")
+
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -32,6 +33,8 @@ def format_phone(phone):
         return "0" + phone_str
     return phone_str
 
+
+
 # -----------------------------------------------------------------------------
 # 1) Google Sheets: build service account credentials
 # -----------------------------------------------------------------------------
@@ -46,6 +49,23 @@ def get_google_sheets_service():
 # -----------------------------------------------------------------------------
 # 2) Local Excel loading
 # -----------------------------------------------------------------------------
+# def load_local_excel():
+#     if not os.path.exists(LOCAL_EXCEL_PATH):
+#         df = pd.DataFrame(columns=[
+#             "No",
+#             "Nama Lengkap Peserta (Suami)",
+#             "Nama Lengkap Peserta (Istri)",
+#             "Nomor Handphone/ WA",
+#             "Tanggal Pernikahan"
+#         ])
+#         df.to_excel(LOCAL_EXCEL_PATH, index=False)
+
+#     # Specify dtype for the phone column
+#     df = pd.read_excel(LOCAL_EXCEL_PATH, dtype={"Nomor Handphone/ WA": str})
+#       # 3) Remove any newline or carriage-return from the cells
+#     df.replace({r'[\r\n]+': ' '}, regex=True, inplace=True)
+#     return df
+
 def load_local_excel():
     if not os.path.exists(LOCAL_EXCEL_PATH):
         df = pd.DataFrame(columns=[
@@ -57,8 +77,25 @@ def load_local_excel():
         ])
         df.to_excel(LOCAL_EXCEL_PATH, index=False)
 
-    # Specify dtype for the phone column
-    df = pd.read_excel(LOCAL_EXCEL_PATH, dtype={"Nomor Handphone/ WA": str})
+    # 1) Read Excel as string dtype (avoids float -> string conflicts)
+    df = pd.read_excel(LOCAL_EXCEL_PATH, dtype=str)
+
+    # 2) Replace any "nan" or actual NaN with "" 
+    #    (Sometimes Excel stores empty cells as np.nan, 
+    #     but now the dtype is 'object'/'str', so "nan" might appear.)
+    df = df.replace("nan", "", regex=False)
+    df = df.fillna("")  # Double safety
+
+    # 3) Remove newlines
+    df.replace({r'[\r\n]+': ' '}, regex=True, inplace=True)
+
+    # 4) Remove trailing ".0" if it exists in phone column
+    #    e.g. "08123.0" => "08123"
+    # if "Nomor Handphone/ WA" in df.columns:
+    #     df["Nomor Handphone/ WA"] = df["Nomor Handphone/ WA"].apply(
+    #         lambda x: x[:-2] if x.endswith(".0") else x
+    #     )
+
     return df
 
 
@@ -208,7 +245,7 @@ def update_google_sheet(
             sheets_service.values().update(
                 spreadsheetId=GOOGLE_SHEET_ID,
                 range=f"Sheet1!A{next_row}:C{next_row}",
-                valueInputOption="USER_ENTERED",
+                valueInputOption="RAW",
                 body={"values": [new_values]}
             ).execute()
             print(f"[GoogleSheet] Appended row for {date_str} => attendance={attendance_str}")
@@ -228,6 +265,39 @@ def update_google_sheet(
         if not skip_offline:
             store_offline_update(date_str, attendance_str, remarks_str)
         return False
+
+def sync_local_excel_to_sheet(sheets_service):
+    try:
+        df = load_local_excel()
+
+        # 1) Remove all newline/carriage-return characters that break the JSON
+        df = df.replace({r'[\r\n]+': ' '}, regex=True)
+
+        # Convert to list of lists, including header
+        columns = list(df.columns)
+        values = [columns] + df.values.tolist()
+
+        # Clear 'Sheet2'
+        sheets_service.values().clear(
+            spreadsheetId=GOOGLE_SHEET_ID,
+            range="Sheet2"
+        ).execute()
+
+        # Update 'Sheet2' in RAW mode or USER_ENTERED, your choice.
+        sheets_service.values().update(
+            spreadsheetId=GOOGLE_SHEET_ID,
+            range="Sheet2",  # or 'Sheet2!A1'
+            valueInputOption="RAW",
+            body={"values": values}
+        ).execute()
+
+        print("[Sheet2] Synced local Excel to Sheet2 successfully.")
+        return True
+
+    except Exception as e:
+        print(f"[Sheet2] Error syncing to Sheet2: {e}")
+        return False
+
 
 
 # -----------------------------------------------------------------------------
@@ -300,8 +370,13 @@ async def submit_presence(
     """
     try:
         df = load_local_excel()
+
+        # Ensure there's a 'Remarks' column
+        if "Remarks" not in df.columns:
+            df["Remarks"] = ""
+
         # We'll store the presence under an ISO col in local Excel
-        today_col = datetime.now().strftime("%Y-%m-%d")  # "2025-04-09"
+        today_col = datetime.now().strftime("%d-%m-%Y")  # "09-04-2025"
 
         # But for the Google Sheet, we want "DD-MM-YYYY"
         date_str = datetime.now().strftime("%d-%m-%Y")   # "09-04-2025"
@@ -309,33 +384,35 @@ async def submit_presence(
          # Format the phone number so it always has a leading 0.
         phone_str = format_phone(phone_number)
 
+
         existing = df[
             (df["Nama Lengkap Peserta (Suami)"] == nama_suami) &
             (df["Nama Lengkap Peserta (Istri)"] == nama_istri)
         ]
 
         if existing.empty:
-            # new
             new_row = {
                 "No": len(df) + 1,
                 "Nama Lengkap Peserta (Suami)": nama_suami,
                 "Nama Lengkap Peserta (Istri)": nama_istri,
                 "Nomor Handphone/ WA": phone_str,
-                "Tanggal Pernikahan": tanggal_pernikahan
+                "Tanggal Pernikahan": tanggal_pernikahan,
+                "Remarks": remarks or ""
             }
             if today_col not in df.columns:
                 df[today_col] = ""
             new_row[today_col] = "Attend"
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
         else:
-            # existing
             idx = existing.index[0]
             df.loc[idx, "Nomor Handphone/ WA"] = phone_str
             df.loc[idx, "Tanggal Pernikahan"] = tanggal_pernikahan
+            df.loc[idx, "Remarks"] = remarks or ""
 
             if today_col not in df.columns:
                 df[today_col] = ""
             df.loc[idx, today_col] = "Attend"
+
 
         df.to_excel(LOCAL_EXCEL_PATH, index=False)
 
@@ -343,19 +420,82 @@ async def submit_presence(
         attendance_count = (df[today_col] == "Attend").sum()
         attendance_str = str(int(attendance_count))
 
-        # Update Google sheet (or queue offline if fails)
-        ok = update_google_sheet(date_str, attendance_str, remarks or "")
-        if ok:
-            return JSONResponse({"success": True, "message": "Presence recorded successfully"})
-        else:
-            return JSONResponse({
-                "success": True,
-                "message": "Presence recorded locally, but offline. Will sync later."
-            })
+        # # Update Google sheet (or queue offline if fails)
+        # update_ok = update_google_sheet(date_str, attendance_str, remarks or "")
+        # if update_ok:
+        #     # 2) If that worked, also copy entire local Excel to "Sheet2"
+        #     sheets_service = get_google_sheets_service()
+        #     sync_local_excel_to_sheet(sheets_service)
+
+        #     return JSONResponse({
+        #         "success": True,
+        #         "message": "Presence recorded successfully"
+        #     })
+        # else:
+        #     # Remains offline, queued for next time
+        #     return JSONResponse({
+        #         "success": True, 
+        #         "message": "Presence recorded locally, but offline. Will sync later."
+        #     })
+           # Return success immediately; no Sheet calls here
+        return JSONResponse({
+            "success": True,
+            "message": "Presence recorded locally (no Google Sheet call)."
+        })
+
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ----------------------------------------------------------------
+# Lifecycle using add_event_handler instead of @app.on_event
+# ----------------------------------------------------------------
+
+# ------------------------------
+#  Lifecycle: Startup & Shutdown
+# ------------------------------
+
+def on_startup():
+    """
+    Called once when the server starts.
+    We replay any offline updates (so they get pushed to Google if possible).
+    """
+    print("App starting up. Attempting to replay offline updates...")
+    try:
+        sheets_service = get_google_sheets_service()
+        replay_offline_updates(sheets_service)  # If any
+        print("Startup complete. Offline updates replayed.")
+    except Exception as e:
+        print(f"Startup error: {e}")
+
+def on_shutdown():
+    print("App shutting down... Attempting final data push to Google Sheets...")
+    try:
+        df = load_local_excel()
+        today_col = datetime.now().strftime("%d-%m-%Y")
+        attendance_count = (df[today_col] == "Attend").sum()
+        attendance_str = str(attendance_count)
+
+        # Gather all remarks for today's attends
+        # Just combine them into one line. 
+        remarks_list = df.loc[df[today_col] == "Attend", "Remarks"].tolist()
+        combined_remarks = "; ".join(r for r in remarks_list if r)
+
+        update_ok = update_google_sheet(today_col, attendance_str, combined_remarks)
+        if update_ok:
+            sheets_service = get_google_sheets_service()
+            sync_local_excel_to_sheet(sheets_service)
+            print("Shutdown: local Excel was fully synced.")
+        else:
+            print("Shutdown: Went offline. Data queued for next startup replay.")
+
+    except Exception as e:
+        print(f"Shutdown error: {e}")
+
+
+
+app.add_event_handler("startup", on_startup)
+app.add_event_handler("shutdown", on_shutdown)
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
